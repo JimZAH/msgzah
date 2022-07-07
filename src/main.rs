@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, Read, Write};
+use std::io::{self, stdin, stdout, Read, Write};
 use std::str;
 
 
@@ -7,11 +7,12 @@ const MAX_CALL: usize = 8;
 const MAX_BUFF: usize = 4 * 1024;
 
 // Messages
-const COMMANDS_MSG: &str = "H: Help, S: Compose Message, L: List Messages, E: Exit\n";
+const COMMANDS_MSG: &str = "E: Exit, H: Help, L: List Messages, M: My Details, Q: Set Home Mailbox, S: Compose Message\n";
 const WELCOME_MSG: &str = "You have connected to M0ZAH Mailbox\nMSGZAH Version: 0.1";
 const USER_PROMPT: &str = ">>> ";
 const UNKNOWN_PROMPT: &str = "?";
 const COMPOSE_MSG: &str = "Please enter your message and use /e to finish\n";
+const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
 
 struct User {
     callsign: String,
@@ -23,7 +24,7 @@ impl User {
     fn new() -> Self {
         Self {
             callsign: String::new(),
-            qth: String::new(),
+            qth: String::from("N0HOME"),
             total_session_bytes: 0,
         }
     }
@@ -76,6 +77,20 @@ fn main() {
 
             // List Messages
             76 | 108 => {}
+
+            // List My Details
+            77 | 109 => {
+                let details = format!(
+                    "Callsign: {}\nHome Mailbox: {}\n\nTotal Bytes Received: {}\n",
+                    user.callsign, user.qth, user.total_session_bytes
+                );
+                screen_write(&details);
+            }
+
+            // Set Home Mailbox
+            81 | 113 => {
+                screen_write(HOME_BBS_PROMPT);    
+            }
 
             // Send msg
             83 | 115 => {
