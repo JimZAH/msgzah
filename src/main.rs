@@ -1,23 +1,42 @@
-use std::io::{self, stdin, stdout, Read, Write};
+use std::io::{stdin, stdout, Read, Write};
 use std::str;
 
-
 // Buffer sizes
-const MAX_CALL: usize = 8;
+const MAX_CALL: usize = 10;
 const MAX_BUFF: usize = 4 * 1024;
 
 // Messages
-const COMMANDS_MSG: &str = "E: Exit, H: Help, L: List Messages, M: My Details, Q: Set Home Mailbox, S: Compose Message\n";
+const COMMANDS_MSG: &str =
+    "E: Exit, H: Help, L: List Messages, M: My Details, Q: Set Home Mailbox, S: Compose Message\n";
 const WELCOME_MSG: &str = "You have connected to M0ZAH Mailbox\nMSGZAH Version: 0.1";
 const USER_PROMPT: &str = ">>> ";
 const UNKNOWN_PROMPT: &str = "?";
 const COMPOSE_MSG: &str = "Please enter your message and use /e to finish\n";
+const TO_MSG: &str = "TO: ";
 const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
 
+struct Message {
+    to: String,
+    sender: User,
+    date: String,
+    text: String,
+}
+#[derive(Debug, Clone)]
 struct User {
     callsign: String,
     qth: String,
-    total_session_bytes: usize
+    total_session_bytes: usize,
+}
+
+impl Message {
+    fn new() -> Self {
+        Self {
+            to: String::new(),
+            sender: User::new(),
+            date: String::new(),
+            text: String::new(),
+        }
+    }
 }
 
 impl User {
@@ -30,8 +49,45 @@ impl User {
     }
 }
 
+fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
+    let mut in_buff = [0; MAX_BUFF];
+    for (i, c) in stdin().bytes().enumerate() {
+        if let Ok(r) = c {
+            in_buff[i] = r;
+            user.total_session_bytes += i;
+        };
+
+        if i == MAX_BUFF || i == size {
+            return in_buff;
+        }
+
+        match esac {
+            Some(es) => {
+                if i > 1 {
+                    if es == 10 && in_buff[i] == es {
+                        return in_buff;
+                    }
+                    match in_buff.get(i - 1) {
+                        Some(v) => {
+                            if v == &47 && in_buff[i] == es {
+                                println!("Received: {} Bytes", i);
+                                in_buff[i] = 0;
+                                in_buff[i - 1] = 0;
+                                return in_buff;
+                            }
+                        }
+                        None => {}
+                    }
+                }
+            }
+            None => continue,
+        }
+    }
+    in_buff
+}
+
 fn screen_write(b: &str) {
-    stdout().write_all(&b.as_bytes()).unwrap();
+    stdout().write_all(b.as_bytes()).unwrap();
     stdout().flush().unwrap();
 }
 
@@ -39,9 +95,8 @@ fn main() {
     let mut user: User = User::new();
 
     let mut in_buff = [0; MAX_BUFF];
-    let mut out_buff = [0; MAX_BUFF];
 
-    if let Ok(bc) = stdin().read(&mut in_buff[..MAX_CALL]){
+    if let Ok(bc) = stdin().read(&mut in_buff[..MAX_CALL]) {
         user.total_session_bytes += bc;
     }
 
@@ -58,9 +113,7 @@ fn main() {
     screen_write(&welcome);
 
     loop {
-        if let Ok(bc) = stdin().read(&mut in_buff[..1]){
-            user.total_session_bytes += bc;
-        }
+        in_buff = get_input(None, &mut user, 0);
 
         match in_buff[0] {
             10 => {
@@ -89,33 +142,36 @@ fn main() {
 
             // Set Home Mailbox
             81 | 113 => {
-                screen_write(HOME_BBS_PROMPT);    
+                screen_write(HOME_BBS_PROMPT);
+                in_buff = get_input(Some(10), &mut user, MAX_CALL);
+                user.qth = match str::from_utf8(&in_buff[..MAX_CALL]) {
+                    Ok(v) => v.to_owned().replace('\n', ""),
+                    Err(_) => "N0CALL".to_owned(),
+                };
+                println!("HomeBBS: {}", user.qth);
             }
 
             // Send msg
             83 | 115 => {
+                let mut msg: Message = Message::new();
+                msg.sender = user.clone();
+                screen_write(TO_MSG);
+                let to = get_input(Some(10), &mut user, MAX_CALL);
+                msg.to = match str::from_utf8(&to[..MAX_CALL]) {
+                    Ok(v) => v.to_owned().replace('\n', ""),
+                    Err(_) => "N0CALL".to_owned(),
+                };
+                println!("{}", msg.to);
                 screen_write(COMPOSE_MSG);
-                for (i, c) in stdin().bytes().enumerate() {
-                    if let Ok(r) = c {
-                        in_buff[i] = r
-                    };
-
-                    if i == MAX_BUFF {
-                        return;
-                    }
-
-                    if i > 1 {
-                        match in_buff.get(i - 1) {
-                            Some(v) => {
-                                if v == &47 && in_buff[i] == 101 {
-                                    println!("Received: {} Bytes", i);
-                                    return;
-                                }
-                            }
-                            None => {}
-                        }
-                    }
-                }
+                in_buff = get_input(Some(101), &mut user, MAX_BUFF);
+                msg.text = match str::from_utf8(&in_buff[..MAX_BUFF]) {
+                    Ok(v) => v.to_owned(),
+                    Err(_) => "N0CALL".to_owned(),
+                };
+                println!(
+                    "From: {}\nTo: {}\n{}",
+                    msg.sender.callsign, msg.to, msg.text
+                );
             }
 
             _ => {
