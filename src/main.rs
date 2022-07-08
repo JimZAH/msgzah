@@ -57,14 +57,13 @@ fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
             user.total_session_bytes += i;
         };
 
-        if i == MAX_BUFF || i == size {
-            return in_buff;
+        // Testing 0D strip
+        if in_buff[i] == 13{
+            in_buff[i] = 0;
         }
 
-        // Testing 0D strip
-        if i > 1 && i < 3 && in_buff[i-1] == 48 && in_buff[i] == 68{
-            in_buff[i-1] = 0;
-            in_buff[i] = 0;
+        if i == MAX_BUFF || i == size {
+            return in_buff;
         }
 
         match esac {
