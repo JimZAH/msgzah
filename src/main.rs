@@ -61,6 +61,12 @@ fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
             return in_buff;
         }
 
+        // Testing 0D strip
+        if i > 1 && i < 3 && in_buff[i-1] == 48 && in_buff[i] == 68{
+            in_buff[i-1] = 0;
+            in_buff[i] = 0;
+        }
+
         match esac {
             Some(es) => {
                 if i > 1 {
