@@ -21,7 +21,7 @@ struct Message {
     date: String,
     text: String,
 }
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct User {
     callsign: String,
     qth: String,
@@ -121,6 +121,10 @@ fn main() {
         in_buff = get_input(None, &mut user, 0);
 
         match in_buff[0] {
+            0 => {
+                // Ignore 0
+            }
+
             10 => {
                 screen_write(USER_PROMPT);
             }
