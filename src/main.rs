@@ -1,5 +1,8 @@
+use std::fs::{self, File};
 use std::io::{stdin, stdout, Read, Write};
 use std::str;
+use std::path::Path;
+use chrono::prelude::*;
 
 // Buffer sizes
 const MAX_CALL: usize = 10;
@@ -18,7 +21,7 @@ const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
 struct Message {
     to: String,
     sender: User,
-    date: String,
+    date: chrono::DateTime<chrono::Utc>,
     text: String,
 }
 #[derive(Clone)]
@@ -33,7 +36,7 @@ impl Message {
         Self {
             to: String::new(),
             sender: User::new(),
-            date: String::new(),
+            date: Utc::now(),
             text: String::new(),
         }
     }
@@ -58,7 +61,7 @@ fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
         };
 
         // Testing 0D strip
-        if in_buff[i] == 13{
+        if in_buff[i] == 13 {
             in_buff[i] = 0;
         }
 
@@ -101,10 +104,7 @@ fn main() {
 
     let mut in_buff = [0; MAX_BUFF];
 
-    if let Ok(bc) = stdin().read(&mut in_buff[..MAX_CALL]) {
-        user.total_session_bytes += bc;
-    }
-
+    in_buff = get_input(Some(10), &mut user, MAX_CALL);
     user.callsign = match str::from_utf8(&in_buff[..MAX_CALL]) {
         Ok(v) => v.to_owned(),
         Err(_) => "N0CALL".to_owned(),
@@ -138,7 +138,12 @@ fn main() {
             }
 
             // List Messages
-            76 | 108 => {}
+            76 | 108 => {
+                let f = fs::read_dir("./store").unwrap();
+                for file in f{
+                    println!("{}", file.unwrap().path().display());
+                }
+            }
 
             // List My Details
             77 | 109 => {
@@ -162,6 +167,7 @@ fn main() {
 
             // Send msg
             83 | 115 => {
+                let fbuff = [0; MAX_BUFF+MAX_CALL];
                 let mut msg: Message = Message::new();
                 msg.sender = user.clone();
                 screen_write(TO_MSG);
@@ -172,6 +178,7 @@ fn main() {
                 };
                 println!("{}", msg.to);
                 screen_write(COMPOSE_MSG);
+                msg.date = Utc::now();
                 in_buff = get_input(Some(101), &mut user, MAX_BUFF);
                 msg.text = match str::from_utf8(&in_buff[..MAX_BUFF]) {
                     Ok(v) => v.to_owned(),
@@ -181,6 +188,17 @@ fn main() {
                     "From: {}\nTo: {}\n{}",
                     msg.sender.callsign, msg.to, msg.text
                 );
+                let path_construct = format!("{}-{}.dat",  msg.date, msg.sender.callsign.replace('\0', ""));
+                let path = Path::new(&path_construct);
+                
+                if let Ok(mut f) = File::create(path){
+                    match f.write_all(&in_buff){
+                        Err(e) => {println!("{}", e)}
+                        Ok(_) => {
+                            println!("file written");
+                        }
+                    }
+                }
             }
 
             _ => {
