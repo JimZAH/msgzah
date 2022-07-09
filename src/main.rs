@@ -188,7 +188,7 @@ fn main() {
                     continue;
                 }
 
-                msg.show(in_buff[1] as usize - 48);
+                msg.show(sel);
             }
 
             // List My Details
