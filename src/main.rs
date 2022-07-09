@@ -22,8 +22,10 @@ struct Message {
     to: String,
     sender: User,
     date: chrono::DateTime<chrono::Utc>,
+    messages: Vec<std::path::PathBuf>,
     text: String,
 }
+
 #[derive(Clone)]
 struct User {
     callsign: String,
@@ -37,8 +39,44 @@ impl Message {
             to: String::new(),
             sender: User::new(),
             date: Utc::now(),
+            messages: std::vec::Vec::new(),
             text: String::new(),
         }
+    }
+
+    fn load(&mut self) {
+        if let Ok(message_location) = fs::read_dir("./store"){
+            for (_, m) in message_location.enumerate(){
+                let p = m.unwrap().path();
+                self.messages.push(p);
+            }
+        }
+    }
+
+    fn save(self) {
+        let path_construct = format!("./store/{}-{}.dat",  self.date, self.sender.callsign.replace('\0', ""));
+        let path = Path::new(&path_construct);
+        if let Ok(mut f) = File::create(path){
+            match f.write_all(&self.text.as_bytes()){
+                Err(e) => {println!("Error: {}", e)}
+                Ok(_) => {
+                    println!("Saved!");
+                }
+            }
+        }
+    }
+
+    fn show(&mut self, msg_num: usize){
+        let mut d_buff = [0; MAX_BUFF];
+        if let Ok(mut f) = File::open(self.messages[msg_num].as_path()){
+            f.read(&mut d_buff[..]);
+            self.text = match str::from_utf8(&d_buff[..MAX_BUFF]) {
+                Ok(v) => v.to_owned(),
+                Err(_) => "N0CALL".to_owned(),
+            };
+        }
+        println!("{}", self.text);
+        
     }
 }
 
@@ -102,9 +140,7 @@ fn screen_write(b: &str) {
 fn main() {
     let mut user: User = User::new();
 
-    let mut in_buff = [0; MAX_BUFF];
-
-    in_buff = get_input(Some(10), &mut user, MAX_CALL);
+    let mut in_buff = get_input(Some(10), &mut user, MAX_CALL);
     user.callsign = match str::from_utf8(&in_buff[..MAX_CALL]) {
         Ok(v) => v.to_owned(),
         Err(_) => "N0CALL".to_owned(),
@@ -139,10 +175,12 @@ fn main() {
 
             // List Messages
             76 | 108 => {
-                let f = fs::read_dir("./store").unwrap();
-                for file in f{
-                    println!("{}", file.unwrap().path().display());
+                let mut msg: Message = Message::new();
+                msg.load();
+                for p in &msg.messages{
+                    println!("{}",p.display());
                 }
+                msg.show(0);
             }
 
             // List My Details
@@ -188,17 +226,7 @@ fn main() {
                     "From: {}\nTo: {}\n{}",
                     msg.sender.callsign, msg.to, msg.text
                 );
-                let path_construct = format!("./store/{}-{}.dat",  msg.date, msg.sender.callsign.replace('\0', ""));
-                let path = Path::new(&path_construct);
-                
-                if let Ok(mut f) = File::create(path){
-                    match f.write_all(&in_buff){
-                        Err(e) => {println!("{}", e)}
-                        Ok(_) => {
-                            println!("file written");
-                        }
-                    }
-                }
+                msg.save();
             }
 
             _ => {
