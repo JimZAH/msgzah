@@ -17,6 +17,7 @@ const UNKNOWN_PROMPT: &str = "?";
 const COMPOSE_MSG: &str = "Please enter your message and use /e to finish\n";
 const TO_MSG: &str = "TO: ";
 const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
+const MESSAGE_SELECT_PROMPT: &str = "Please enter the message number you'd like to read!\n";
 
 struct Message {
     to: String,
@@ -54,7 +55,7 @@ impl Message {
     }
 
     fn save(self) {
-        let path_construct = format!("./store/{}-{}.dat",  self.date, self.sender.callsign.replace('\0', ""));
+        let path_construct = format!("./store/{}-{}.dat",  self.date, self.sender.callsign.replace('\0', "").replace("\n", ""));
         let path = Path::new(&path_construct);
         if let Ok(mut f) = File::create(path){
             match f.write_all(&self.text.as_bytes()){
@@ -95,7 +96,7 @@ fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
     for (i, c) in stdin().bytes().enumerate() {
         if let Ok(r) = c {
             in_buff[i] = r;
-            user.total_session_bytes += i;
+            user.total_session_bytes += i+1;
         };
 
         // Testing 0D strip
@@ -177,10 +178,17 @@ fn main() {
             76 | 108 => {
                 let mut msg: Message = Message::new();
                 msg.load();
-                for p in &msg.messages{
-                    println!("{}",p.display());
+                for (i, p) in msg.messages.iter().enumerate(){
+                    println!("Message: [{}] -> {}",i, p.display());
                 }
-                msg.show(0);
+                screen_write(MESSAGE_SELECT_PROMPT);
+                in_buff = get_input(None, &mut user, 1);
+                let sel = in_buff[1] as usize - 48;
+                if sel >= msg.messages.len() || !(0..=9).contains(&sel) {
+                    continue;
+                }
+
+                msg.show(in_buff[1] as usize - 48);
             }
 
             // List My Details
