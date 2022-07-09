@@ -188,7 +188,7 @@ fn main() {
                     "From: {}\nTo: {}\n{}",
                     msg.sender.callsign, msg.to, msg.text
                 );
-                let path_construct = format!("{}-{}.dat",  msg.date, msg.sender.callsign.replace('\0', ""));
+                let path_construct = format!("./store/{}-{}.dat",  msg.date, msg.sender.callsign.replace('\0', ""));
                 let path = Path::new(&path_construct);
                 
                 if let Ok(mut f) = File::create(path){
