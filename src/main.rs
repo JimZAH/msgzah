@@ -1,8 +1,8 @@
+use chrono::prelude::*;
 use std::fs::{self, File};
 use std::io::{stdin, stdout, Read, Write};
-use std::str;
 use std::path::Path;
-use chrono::prelude::*;
+use std::str;
 
 // Buffer sizes
 const MAX_CALL: usize = 10;
@@ -18,6 +18,12 @@ const COMPOSE_MSG: &str = "Please enter your message and use /e to finish\n";
 const TO_MSG: &str = "TO: ";
 const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
 const MESSAGE_SELECT_PROMPT: &str = "Please enter the message number you'd like to read!\n";
+
+enum EventType {
+    Raw,
+    Capital,
+    Decimal,
+}
 
 struct Message {
     to: String,
@@ -46,8 +52,8 @@ impl Message {
     }
 
     fn load(&mut self) {
-        if let Ok(message_location) = fs::read_dir("./store"){
-            for (_, m) in message_location.enumerate(){
+        if let Ok(message_location) = fs::read_dir("./store") {
+            for (_, m) in message_location.enumerate() {
                 let p = m.unwrap().path();
                 self.messages.push(p);
             }
@@ -55,11 +61,17 @@ impl Message {
     }
 
     fn save(self) {
-        let path_construct = format!("./store/{}-{}.dat",  self.date, self.sender.callsign.replace('\0', "").replace("\n", ""));
+        let path_construct = format!(
+            "./store/{}-{}.dat",
+            self.date,
+            self.sender.callsign.replace('\0', "").replace('\n', "")
+        );
         let path = Path::new(&path_construct);
-        if let Ok(mut f) = File::create(path){
-            match f.write_all(&self.text.as_bytes()){
-                Err(e) => {println!("Error: {}", e)}
+        if let Ok(mut f) = File::create(path) {
+            match f.write_all(self.text.as_bytes()) {
+                Err(e) => {
+                    println!("Error: {}", e)
+                }
                 Ok(_) => {
                     println!("Saved!");
                 }
@@ -67,9 +79,9 @@ impl Message {
         }
     }
 
-    fn show(&mut self, msg_num: usize){
+    fn show(&mut self, msg_num: usize) {
         let mut d_buff = [0; MAX_BUFF];
-        if let Ok(mut f) = File::open(self.messages[msg_num].as_path()){
+        if let Ok(mut f) = File::open(self.messages[msg_num].as_path()) {
             f.read(&mut d_buff[..]);
             self.text = match str::from_utf8(&d_buff[..MAX_BUFF]) {
                 Ok(v) => v.to_owned(),
@@ -77,7 +89,6 @@ impl Message {
             };
         }
         println!("{}", self.text);
-        
     }
 }
 
@@ -91,12 +102,27 @@ impl User {
     }
 }
 
-fn get_input(esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
+fn get_input(event: EventType, esac: Option<u8>, user: &mut User, size: usize) -> [u8; MAX_BUFF] {
     let mut in_buff = [0; MAX_BUFF];
     for (i, c) in stdin().bytes().enumerate() {
-        if let Ok(r) = c {
+        if let Ok(mut r) = c {
+            match event {
+                EventType::Raw => {
+                    // Do nothing,
+                }
+                EventType::Capital => {
+                    r -= 32;
+                }
+                EventType::Decimal => {
+                    if (48..=57).contains(&r) {
+                        r -= 48;
+                    } else {
+                        r = 0;
+                    }
+                }
+            }
             in_buff[i] = r;
-            user.total_session_bytes += i+1;
+            user.total_session_bytes += i + 1;
         };
 
         // Testing 0D strip
@@ -141,7 +167,7 @@ fn screen_write(b: &str) {
 fn main() {
     let mut user: User = User::new();
 
-    let mut in_buff = get_input(Some(10), &mut user, MAX_CALL);
+    let mut in_buff = get_input(EventType::Raw, Some(10), &mut user, MAX_CALL);
     user.callsign = match str::from_utf8(&in_buff[..MAX_CALL]) {
         Ok(v) => v.to_owned(),
         Err(_) => "N0CALL".to_owned(),
@@ -155,7 +181,7 @@ fn main() {
     screen_write(&welcome);
 
     loop {
-        in_buff = get_input(None, &mut user, 0);
+        in_buff = get_input(EventType::Raw, None, &mut user, 0);
 
         match in_buff[0] {
             0 => {
@@ -178,15 +204,12 @@ fn main() {
             76 | 108 => {
                 let mut msg: Message = Message::new();
                 msg.load();
-                for (i, p) in msg.messages.iter().enumerate(){
-                    println!("Message: [{}] -> {}",i, p.display());
+                for (i, p) in msg.messages.iter().enumerate() {
+                    println!("Message: [{}] -> {}", i, p.display());
                 }
                 screen_write(MESSAGE_SELECT_PROMPT);
-                in_buff = get_input(Some(0x0A), &mut user, 2);
-                let mut sel = 0 * 10 + in_buff[1] as usize - 48;
-                if in_buff[2] > 47{
-                    sel = sel * 10 + in_buff[2] as usize - 48;
-                }
+                in_buff = get_input(EventType::Decimal, Some(0x0A), &mut user, 2);
+                let sel = in_buff[1] as usize * 10 + in_buff[2] as usize;
                 if sel >= msg.messages.len() || !(0..=99).contains(&sel) {
                     continue;
                 }
@@ -206,7 +229,7 @@ fn main() {
             // Set Home Mailbox
             81 | 113 => {
                 screen_write(HOME_BBS_PROMPT);
-                in_buff = get_input(Some(10), &mut user, MAX_CALL);
+                in_buff = get_input(EventType::Raw, Some(10), &mut user, MAX_CALL);
                 user.qth = match str::from_utf8(&in_buff[..MAX_CALL]) {
                     Ok(v) => v.to_owned().replace('\n', ""),
                     Err(_) => "N0CALL".to_owned(),
@@ -216,11 +239,10 @@ fn main() {
 
             // Send msg
             83 | 115 => {
-                let fbuff = [0; MAX_BUFF+MAX_CALL];
                 let mut msg: Message = Message::new();
                 msg.sender = user.clone();
                 screen_write(TO_MSG);
-                let to = get_input(Some(10), &mut user, MAX_CALL);
+                let to = get_input(EventType::Raw, Some(10), &mut user, MAX_CALL);
                 msg.to = match str::from_utf8(&to[..MAX_CALL]) {
                     Ok(v) => v.to_owned().replace('\n', ""),
                     Err(_) => "N0CALL".to_owned(),
@@ -228,7 +250,7 @@ fn main() {
                 println!("{}", msg.to);
                 screen_write(COMPOSE_MSG);
                 msg.date = Utc::now();
-                in_buff = get_input(Some(101), &mut user, MAX_BUFF);
+                in_buff = get_input(EventType::Raw, Some(101), &mut user, MAX_BUFF);
                 msg.text = match str::from_utf8(&in_buff[..MAX_BUFF]) {
                     Ok(v) => v.to_owned(),
                     Err(_) => "N0CALL".to_owned(),
