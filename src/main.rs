@@ -182,9 +182,9 @@ fn main() {
                     println!("Message: [{}] -> {}",i, p.display());
                 }
                 screen_write(MESSAGE_SELECT_PROMPT);
-                in_buff = get_input(None, &mut user, 1);
-                let sel = in_buff[1] as usize - 48;
-                if sel >= msg.messages.len() || !(0..=9).contains(&sel) {
+                in_buff = get_input(Some(0x0A), &mut user, 2);
+                let sel = 0 * 10 + (in_buff[1] as usize - 48) * 10 + in_buff[2] as usize - 48;
+                if sel >= msg.messages.len() || !(0..=99).contains(&sel) {
                     continue;
                 }
 
