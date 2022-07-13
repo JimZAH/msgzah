@@ -147,7 +147,7 @@ fn get_input(event: EventType, esac: Option<u8>, user: &mut User, size: usize) -
             in_buff[i] = 0;
         }
 
-        if i == MAX_BUFF || i == size {
+        if i == MAX_BUFF-1 || i == size {
             return in_buff;
         }
 
