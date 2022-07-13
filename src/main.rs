@@ -215,6 +215,9 @@ fn main() {
             76 | 108 => {
                 let mut msg: Message = Message::new();
                 msg.load();
+                if msg.messages.len() == 0{
+                    continue;
+                }
                 for (i, p) in msg.messages.iter().enumerate() {
                     println!("Message: [{}] -> {}", i, p.display());
                 }
