@@ -8,6 +8,9 @@ use std::str;
 const MAX_CALL: usize = 10;
 const MAX_BUFF: usize = 4 * 1024;
 
+// Admin
+const ADMIN: &str = "M0ZAH";
+
 // Messages
 const COMMANDS_MSG: &str =
     "E: Exit, H: Help, L: List Messages, M: My Details, Q: Set Home Mailbox, S: Compose Message\n";
@@ -42,11 +45,14 @@ struct User {
 }
 
 impl Message {
-
     fn del(self, msg_num: usize) {
-        match fs::remove_file(&self.messages[msg_num]){
-            Ok(_) => {println!("Msg [{}] deleted", msg_num)},
-            Err(e) => {println!("Delete error: {}", e);}
+        match fs::remove_file(&self.messages[msg_num]) {
+            Ok(_) => {
+                println!("Msg [{}] deleted", msg_num)
+            }
+            Err(e) => {
+                println!("Delete error: {}", e);
+            }
         }
     }
 
@@ -120,7 +126,7 @@ fn get_input(event: EventType, esac: Option<u8>, user: &mut User, size: usize) -
                     // Do nothing,
                 }
                 EventType::Capital => {
-                    if (97..=122).contains(&r){
+                    if (97..=122).contains(&r) {
                         r -= 32;
                     }
                 }
@@ -215,7 +221,7 @@ fn main() {
             76 | 108 => {
                 let mut msg: Message = Message::new();
                 msg.load();
-                if msg.messages.len() == 0{
+                if msg.messages.is_empty() {
                     continue;
                 }
                 for (i, p) in msg.messages.iter().enumerate() {
@@ -229,11 +235,13 @@ fn main() {
                 }
                 msg.show(sel);
 
+                if user.callsign.contains(ADMIN) {
                 screen_write(DELETE_MSG_PROMPT);
                 in_buff = get_input(EventType::Capital, Some(0x0A), &mut user, 0);
-                if in_buff[0] == 89{
+                if in_buff[0] == 89 {
                     msg.del(sel);
                 }
+            }
             }
 
             // List My Details
