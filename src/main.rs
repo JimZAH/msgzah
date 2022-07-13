@@ -18,6 +18,7 @@ const COMPOSE_MSG: &str = "Please enter your message and use /e to finish\n";
 const TO_MSG: &str = "TO: ";
 const HOME_BBS_PROMPT: &str = "Please enter your home BBS/Mailbox\n";
 const MESSAGE_SELECT_PROMPT: &str = "Please enter the message number you'd like to read!\n";
+const DELETE_MSG_PROMPT: &str = "Would you like to delete this message? N/Y: ";
 
 enum EventType {
     Raw,
@@ -41,6 +42,14 @@ struct User {
 }
 
 impl Message {
+
+    fn del(self, msg_num: usize) {
+        match fs::remove_file(&self.messages[msg_num]){
+            Ok(_) => {println!("Msg [{}] deleted", msg_num)},
+            Err(e) => {println!("Delete error: {}", e);}
+        }
+    }
+
     fn new() -> Self {
         Self {
             to: String::new(),
@@ -111,7 +120,9 @@ fn get_input(event: EventType, esac: Option<u8>, user: &mut User, size: usize) -
                     // Do nothing,
                 }
                 EventType::Capital => {
-                    r -= 32;
+                    if (97..=122).contains(&r){
+                        r -= 32;
+                    }
                 }
                 EventType::Decimal => {
                     if (48..=57).contains(&r) {
@@ -213,8 +224,13 @@ fn main() {
                 if sel >= msg.messages.len() || !(0..=99).contains(&sel) {
                     continue;
                 }
-
                 msg.show(sel);
+
+                screen_write(DELETE_MSG_PROMPT);
+                in_buff = get_input(EventType::Capital, Some(0x0A), &mut user, 0);
+                if in_buff[0] == 89{
+                    msg.del(sel);
+                }
             }
 
             // List My Details
