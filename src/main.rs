@@ -4,6 +4,9 @@ use std::io::{stdin, stdout, Read, Write};
 use std::path::Path;
 use std::str;
 
+// Offsets
+const LIST_SEL: usize = 1;
+
 // Buffer sizes
 const MAX_CALL: usize = 10;
 const MAX_BUFF: usize = 4 * 1024;
@@ -97,7 +100,13 @@ impl Message {
     fn show(&mut self, msg_num: usize) {
         let mut d_buff = [0; MAX_BUFF];
         if let Ok(mut f) = File::open(self.messages[msg_num].as_path()) {
-            f.read(&mut d_buff[..]);
+            match f.read(&mut d_buff[..]) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return;
+                }
+            }
             self.text = match str::from_utf8(&d_buff[..MAX_BUFF]) {
                 Ok(v) => v.to_owned(),
                 Err(_) => "N0CALL".to_owned(),
@@ -147,7 +156,7 @@ fn get_input(event: EventType, esac: Option<u8>, user: &mut User, size: usize) -
             in_buff[i] = 0;
         }
 
-        if i == MAX_BUFF-1 || i == size {
+        if i == MAX_BUFF - 1 || i == size {
             return in_buff;
         }
 
@@ -229,19 +238,19 @@ fn main() {
                 }
                 screen_write(MESSAGE_SELECT_PROMPT);
                 in_buff = get_input(EventType::Decimal, Some(0x0A), &mut user, 2);
-                let sel = in_buff[1] as usize * 10 + in_buff[2] as usize;
+                let sel = in_buff[LIST_SEL] as usize * 10 + in_buff[LIST_SEL + 1] as usize;
                 if sel >= msg.messages.len() || !(0..=99).contains(&sel) {
                     continue;
                 }
                 msg.show(sel);
 
                 if user.callsign.contains(ADMIN) {
-                screen_write(DELETE_MSG_PROMPT);
-                in_buff = get_input(EventType::Capital, Some(0x0A), &mut user, 0);
-                if in_buff[0] == 89 {
-                    msg.del(sel);
+                    screen_write(DELETE_MSG_PROMPT);
+                    in_buff = get_input(EventType::Capital, Some(0x0A), &mut user, 0);
+                    if in_buff[0] == 89 {
+                        msg.del(sel);
+                    }
                 }
-            }
             }
 
             // List My Details
